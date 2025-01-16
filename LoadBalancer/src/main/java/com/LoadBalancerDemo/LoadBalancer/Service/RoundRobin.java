@@ -24,6 +24,7 @@ public class RoundRobin {
     private final List<Server> servers;
     private final AtomicInteger currentIndex = new AtomicInteger(0);
     private final WebClient webClient;
+
     private final Counter requestCounter;
     private final Counter errorCounter;
     private final Map<String, Counter> serverRequestCounters;
@@ -46,7 +47,8 @@ public class RoundRobin {
                 .register(registry);
 
         // Initialize per-server counters
-        this.serverRequestCounters = servers.stream()
+        this.serverRequestCounters = servers
+                .stream()
                 .collect(Collectors.toMap(
                     Server::getUrl,
                     server -> Counter.builder("loadbalancer.server.requests")
@@ -89,15 +91,12 @@ public class RoundRobin {
                 .doOnError(error -> {
                     errorCounter.increment();
                     handleServerFailure(server);
-                    forwardRequest(safeBody, request).subscribe();
                 });
     }
 
     private Server getNextHealthyServer() {
         int attempts = 0;
-        int maxAttempts = servers.size();
-
-        while (attempts < maxAttempts) {
+        while (attempts < servers.size()) {
             int index = currentIndex.getAndIncrement() % servers.size();
             Server server = servers.get(index);
 
@@ -107,7 +106,7 @@ public class RoundRobin {
             attempts++;
         }
 
-        throw new RuntimeException("No healthy servers available");
+        throw new RuntimeException("No healthy downstream");
     }
 
     private boolean isServerAvailable(Server server) {

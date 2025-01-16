@@ -22,7 +22,7 @@ public class LoadBalancerApplication {
 	public WebClient webClient() {
 		return WebClient.builder()
 				.clientConnector(new ReactorClientHttpConnector(HttpClient.create()
-						.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 3000)
+						.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 30000)
 						.responseTimeout(Duration.ofSeconds(3))
 				))
 				.defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)

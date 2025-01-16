@@ -2,7 +2,6 @@ package com.LoadBalancerDemo.LoadBalancer.Service;
 
 import com.LoadBalancerDemo.LoadBalancer.Models.Server;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -38,21 +37,19 @@ public class RoundRobin {
                 new Server("http://localhost:8083")
         ));
 
-        this.requestCounter = Counter
-                .builder("loadbalancer.requests.total")
+        this.requestCounter = Counter.builder("loadbalancer.requests.total")
                 .description("Total number of requests processed")
                 .register(registry);
         
-        this.errorCounter = Counter
-                .builder("loadbalancer.requests.errors")
+        this.errorCounter = Counter.builder("loadbalancer.requests.errors")
                 .description("Total number of failed requests")
                 .register(registry);
 
+        // Initialize per-server counters
         this.serverRequestCounters = servers.stream()
                 .collect(Collectors.toMap(
                     Server::getUrl,
-                    server -> Counter
-                            .builder("loadbalancer.server.requests")
+                    server -> Counter.builder("loadbalancer.server.requests")
                             .tag("server", server.getUrl())
                             .description("Requests per server")
                             .register(registry)
@@ -72,27 +69,11 @@ public class RoundRobin {
 
         return webClient.method(method)
                 .uri(url)
-//                .headers(headers -> {
-//                    Enumeration<String> headerNames = request.getHeaderNames();
-//                    while (headerNames.hasMoreElements()) {
-//                        String name = headerNames.nextElement();
-//                        if (!"content-length".equalsIgnoreCase(name)) {
-//                            headers.add(name, request.getHeader(name));
-//                        }
-//                    }
-//                })
-                .headers(headers -> copyHeaders(request, headers))
+                // add headers???
                 .bodyValue(safeBody)
-                .exchangeToMono(clientResponse -> {
-                    // Copy response headers
-                    HttpHeaders headers = new HttpHeaders();
-                    headers.putAll(clientResponse.headers().asHttpHeaders());
-                    
-                    return clientResponse.bodyToMono(String.class)
-                            .map(respBody -> ResponseEntity.status(clientResponse.statusCode())
-                                    .headers(headers)
-                                    .body(respBody));
-                })
+                .exchangeToMono(clientResponse -> clientResponse
+                        .toEntity(String.class)
+                )
                 .doOnSuccess(response -> {
                     server.resetFailCount();
                 })
@@ -102,16 +83,6 @@ public class RoundRobin {
                     forwardRequest(safeBody, request).subscribe();
                 });
     }
-
-    private void copyHeaders(HttpServletRequest request, HttpHeaders headers) {
-        java.util.Enumeration<String> headerNames = request.getHeaderNames();
-        while (headerNames.hasMoreElements()) {
-            String headerName = headerNames.nextElement();
-            String headerValue = request.getHeader(headerName);
-            headers.add(headerName, headerValue);
-        }
-    }
-
 
     private Server getNextHealthyServer() {
         int attempts = 0;

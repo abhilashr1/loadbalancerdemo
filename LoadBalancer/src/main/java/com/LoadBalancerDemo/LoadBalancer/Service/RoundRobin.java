@@ -69,11 +69,20 @@ public class RoundRobin {
 
         return webClient.method(method)
                 .uri(url)
-                // add headers???
-                .bodyValue(safeBody)
-                .exchangeToMono(clientResponse -> clientResponse
-                        .toEntity(String.class)
-                )
+                .headers(headers -> {
+                    Enumeration<String> headerNames = request.getHeaderNames();
+                    while (headerNames != null && headerNames.hasMoreElements()) {
+                        String headerName = headerNames.nextElement();
+                        String headerValue = request.getHeader(headerName);
+                        headers.add(headerName, headerValue);
+                    }
+                })
+                .bodyValue(body != null ? new String(body) : "")
+                .retrieve()
+                .toEntity(String.class)
+//                .exchangeToMono(clientResponse -> clientResponse
+//                        .toEntity(String.class)
+//                )
                 .doOnSuccess(response -> {
                     server.resetFailCount();
                 })

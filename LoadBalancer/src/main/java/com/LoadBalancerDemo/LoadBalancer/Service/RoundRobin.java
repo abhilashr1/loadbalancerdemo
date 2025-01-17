@@ -2,35 +2,31 @@ package com.LoadBalancerDemo.LoadBalancer.Service;
 
 import com.LoadBalancerDemo.LoadBalancer.Models.Server;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
+import org.springframework.web.client.RestTemplate;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Counter;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.Enumeration;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
 public class RoundRobin {
     private final List<Server> servers;
     private final AtomicInteger currentIndex = new AtomicInteger(0);
-    private final WebClient webClient;
+    private final RestTemplate restTemplate;
 
     private final Counter requestCounter;
     private final Counter errorCounter;
     private final Map<String, Counter> serverRequestCounters;
 
-    public RoundRobin(WebClient webClient, MeterRegistry registry) {
-        this.webClient = webClient;
+    public RoundRobin(RestTemplate restTemplate, MeterRegistry registry) {
+        this.restTemplate = restTemplate;
 
         this.servers = new CopyOnWriteArrayList<>(List.of(
                 new Server("http://localhost:8081"),
@@ -41,24 +37,22 @@ public class RoundRobin {
         this.requestCounter = Counter.builder("loadbalancer.requests.total")
                 .description("Total number of requests processed")
                 .register(registry);
-        
+
         this.errorCounter = Counter.builder("loadbalancer.requests.errors")
                 .description("Total number of failed requests")
                 .register(registry);
 
-        // Initialize per-server counters
-        this.serverRequestCounters = servers
-                .stream()
+        this.serverRequestCounters = servers.stream()
                 .collect(Collectors.toMap(
-                    Server::getUrl,
-                    server -> Counter.builder("loadbalancer.server.requests")
-                            .tag("server", server.getUrl())
-                            .description("Requests per server")
-                            .register(registry)
+                        Server::getUrl,
+                        server -> Counter.builder("loadbalancer.server.requests")
+                                .tag("server", server.getUrl())
+                                .description("Requests per server")
+                                .register(registry)
                 ));
     }
 
-    public Mono<ResponseEntity<String>> forwardRequest(byte[] body, HttpServletRequest request) {
+    public ResponseEntity<String> forwardRequest(byte[] body, HttpServletRequest request) {
         String path = request.getRequestURI();
         HttpMethod method = HttpMethod.valueOf(request.getMethod());
 
@@ -67,34 +61,51 @@ public class RoundRobin {
         serverRequestCounters.get(server.getUrl()).increment();
 
         String url = server.getUrl() + path;
-        byte[] safeBody = body == null ? new byte[0] : body;
 
-        return webClient.method(method)
-                .uri(url)
-                .headers(headers -> {
-                    Enumeration<String> headerNames = request.getHeaderNames();
-                    while (headerNames != null && headerNames.hasMoreElements()) {
-                        String headerName = headerNames.nextElement();
-                        String headerValue = request.getHeader(headerName);
-                        headers.add(headerName, headerValue);
-                    }
-                })
-                .bodyValue(body != null ? new String(body) : "")
-                .retrieve()
-                .toEntity(String.class)
-//                .exchangeToMono(clientResponse -> clientResponse
-//                        .toEntity(String.class)
-//                )
-                .doOnSuccess(response -> {
-                    server.resetFailCount();
-                })
-                .doOnError(error -> {
-                    errorCounter.increment();
-                    handleServerFailure(server);
-                });
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            Enumeration<String> headerNames = request.getHeaderNames();
+            while (headerNames != null && headerNames.hasMoreElements()) {
+                String headerName = headerNames.nextElement();
+                String headerValue = request.getHeader(headerName);
+                headers.add(headerName, headerValue);
+            }
+
+            HttpEntity<String> requestEntity = new HttpEntity<>(
+                    body != null ? new String(body) : "",
+                    headers
+            );
+
+            ResponseEntity<String> response = restTemplate.exchange(
+                    url,
+                    method,
+                    requestEntity,
+                    String.class
+            );
+
+            HttpHeaders responseHeaders = new HttpHeaders();
+            responseHeaders.putAll(response.getHeaders());
+            responseHeaders.remove(HttpHeaders.TRANSFER_ENCODING);
+
+            String responseBody = response.getBody();
+            if (responseBody != null) {
+                responseHeaders.setContentLength(responseBody.length());
+            }
+
+            server.resetFailCount();
+            return ResponseEntity
+                    .status(response.getStatusCode())
+                    .headers(responseHeaders)
+                    .body(responseBody);
+
+        } catch (Exception e) {
+            errorCounter.increment();
+            handleServerFailure(server);
+            throw e;
+        }
     }
 
-    private Server getNextHealthyServer() {
+    private synchronized Server getNextHealthyServer() {
         int attempts = 0;
         while (attempts < servers.size()) {
             int index = currentIndex.getAndIncrement() % servers.size();
@@ -106,7 +117,7 @@ public class RoundRobin {
             attempts++;
         }
 
-        throw new RuntimeException("No healthy downstream");
+        throw new RuntimeException("No healthy servers available");
     }
 
     private boolean isServerAvailable(Server server) {

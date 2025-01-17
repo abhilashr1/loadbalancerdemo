@@ -11,12 +11,18 @@ import io.micrometer.core.instrument.Counter;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
 @Service
 public class RoundRobin {
+    private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor(); // Java 21
+
+
     private final List<Server> servers;
     private final AtomicInteger currentIndex = new AtomicInteger(0);
     private final RestTemplate restTemplate;
@@ -52,57 +58,60 @@ public class RoundRobin {
                 ));
     }
 
-    public ResponseEntity<String> forwardRequest(byte[] body, HttpServletRequest request) {
-        String path = request.getRequestURI();
-        HttpMethod method = HttpMethod.valueOf(request.getMethod());
+    public CompletableFuture<ResponseEntity<String>> forwardRequest(byte[] body, HttpServletRequest request) {
+        return CompletableFuture.supplyAsync(() -> {
 
-        Server server = getNextHealthyServer();
-        requestCounter.increment();
-        serverRequestCounters.get(server.getUrl()).increment();
+            String path = request.getRequestURI();
+            HttpMethod method = HttpMethod.valueOf(request.getMethod());
 
-        String url = server.getUrl() + path;
+            Server server = getNextHealthyServer();
+            requestCounter.increment();
+            serverRequestCounters.get(server.getUrl()).increment();
 
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            Enumeration<String> headerNames = request.getHeaderNames();
-            while (headerNames != null && headerNames.hasMoreElements()) {
-                String headerName = headerNames.nextElement();
-                String headerValue = request.getHeader(headerName);
-                headers.add(headerName, headerValue);
+            String url = server.getUrl() + path;
+
+            try {
+                HttpHeaders headers = new HttpHeaders();
+                Enumeration<String> headerNames = request.getHeaderNames();
+                while (headerNames != null && headerNames.hasMoreElements()) {
+                    String headerName = headerNames.nextElement();
+                    String headerValue = request.getHeader(headerName);
+                    headers.add(headerName, headerValue);
+                }
+
+                HttpEntity<String> requestEntity = new HttpEntity<>(
+                        body != null ? new String(body) : "",
+                        headers
+                );
+
+                ResponseEntity<String> response = restTemplate.exchange(
+                        url,
+                        method,
+                        requestEntity,
+                        String.class
+                );
+
+                HttpHeaders responseHeaders = new HttpHeaders();
+                responseHeaders.putAll(response.getHeaders());
+                responseHeaders.remove(HttpHeaders.TRANSFER_ENCODING);
+
+                String responseBody = response.getBody();
+                if (responseBody != null) {
+                    responseHeaders.setContentLength(responseBody.length());
+                }
+
+                server.resetFailCount();
+                return ResponseEntity
+                        .status(response.getStatusCode())
+                        .headers(responseHeaders)
+                        .body(responseBody);
+
+            } catch (Exception e) {
+                errorCounter.increment();
+                handleServerFailure(server);
+                throw e;
             }
-
-            HttpEntity<String> requestEntity = new HttpEntity<>(
-                    body != null ? new String(body) : "",
-                    headers
-            );
-
-            ResponseEntity<String> response = restTemplate.exchange(
-                    url,
-                    method,
-                    requestEntity,
-                    String.class
-            );
-
-            HttpHeaders responseHeaders = new HttpHeaders();
-            responseHeaders.putAll(response.getHeaders());
-            responseHeaders.remove(HttpHeaders.TRANSFER_ENCODING);
-
-            String responseBody = response.getBody();
-            if (responseBody != null) {
-                responseHeaders.setContentLength(responseBody.length());
-            }
-
-            server.resetFailCount();
-            return ResponseEntity
-                    .status(response.getStatusCode())
-                    .headers(responseHeaders)
-                    .body(responseBody);
-
-        } catch (Exception e) {
-            errorCounter.increment();
-            handleServerFailure(server);
-            throw e;
-        }
+        }, executor);
     }
 
     private synchronized Server getNextHealthyServer() {

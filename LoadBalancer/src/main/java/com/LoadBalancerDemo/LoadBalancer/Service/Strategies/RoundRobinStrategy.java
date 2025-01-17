@@ -40,11 +40,6 @@ public class RoundRobinStrategy implements ILoadBalancingStrategy {
     }
 
     @Override
-    public String getName() {
-        return "RoundRobin";
-    }
-
-    @Override
     public void handleServerFailure(Server server) {
         server.setHealthy(false);
     }

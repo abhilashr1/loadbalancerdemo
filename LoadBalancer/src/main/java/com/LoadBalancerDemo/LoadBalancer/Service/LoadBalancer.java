@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import com.LoadBalancerDemo.LoadBalancer.Factory.ServerFactory;
+import com.LoadBalancerDemo.LoadBalancer.Factory.StrategyFactory;
 import com.LoadBalancerDemo.LoadBalancer.Models.Server;
 import com.LoadBalancerDemo.LoadBalancer.Service.Strategies.ILoadBalancingStrategy;
 
@@ -35,12 +36,12 @@ public class LoadBalancer {
     private Map<String, Counter> serverRequestCounters;
 
     public LoadBalancer(RestTemplate restTemplate,
-                        ILoadBalancingStrategy lbStrategy,
+                        StrategyFactory strategyFactory,
                         ServerFactory serverFactory,
                         // add Request and response Builder here
                         MeterRegistry registry) {
         this.restTemplate = restTemplate;
-        this.strategy = lbStrategy;
+        this.strategy = strategyFactory.createStrategy();
         this.servers = serverFactory.initializeServers();
 
         initializeCounters(registry);

@@ -3,6 +3,7 @@ package com.LoadBalancerDemo.LoadBalancer;
 import io.netty.channel.ChannelOption;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -13,6 +14,7 @@ import reactor.netty.http.client.HttpClient;
 import java.time.Duration;
 
 @SpringBootApplication
+@EnableConfigurationProperties
 public class LoadBalancerApplication {
 
 	public static void main(String[] args) {

@@ -1,19 +1,20 @@
 package com.LoadBalancerDemo.LoadBalancer.Controllers;
 
-import com.LoadBalancerDemo.LoadBalancer.Service.RoundRobin;
+import java.util.concurrent.CompletableFuture;
 import jakarta.servlet.http.HttpServletRequest;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.concurrent.CompletableFuture;
+import com.LoadBalancerDemo.LoadBalancer.Service.LoadBalancer;
 
 @RestController
 public class ProxyController {
-    private final RoundRobin loadBalancer;
+    private final LoadBalancer loadBalancer;
 
-    public ProxyController(RoundRobin loadBalancer) {
+    public ProxyController(LoadBalancer loadBalancer) {
         this.loadBalancer = loadBalancer;
     }
 

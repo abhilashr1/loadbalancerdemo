@@ -12,9 +12,11 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
 import java.time.Duration;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
 @EnableConfigurationProperties
+@EnableScheduling
 public class LoadBalancerApplication {
 
 	public static void main(String[] args) {

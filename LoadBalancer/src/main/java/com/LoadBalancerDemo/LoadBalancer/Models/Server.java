@@ -7,18 +7,18 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Server {
-    private final int MAX_RECENT_RESPONSE_TIMES = 10;
+    private static final int RESPONSE_HISTORY_SIZE = 10;
 
     private final String url;
     private LocalDateTime lastFailure;
+    private final Queue<Long> recentResponseTimes;
 
     private final AtomicBoolean healthy = new AtomicBoolean(true);
-    private final AtomicInteger consecutiveErrors = new AtomicInteger(0);
-
-    private final Queue<Long> recentResponseTimes = new ConcurrentLinkedQueue<>();
+    private final AtomicInteger errors = new AtomicInteger(0);
 
     public Server(String url) {
         this.url = url;
+        this.recentResponseTimes = new ConcurrentLinkedQueue<>();
     }
 
     public String getUrl() {
@@ -42,23 +42,23 @@ public class Server {
 
     public void resetFailCount() {
         this.healthy.set(true);
-        this.consecutiveErrors.set(0);
+        this.errors.set(0);
         this.recentResponseTimes.clear();
     }
 
     public void addResponseTime(long responseTime) {
         recentResponseTimes.offer(responseTime);
-        while (recentResponseTimes.size() > MAX_RECENT_RESPONSE_TIMES) {
+        while (recentResponseTimes.size() > RESPONSE_HISTORY_SIZE) {
             recentResponseTimes.poll();
         }
     }
 
     public void incrementErrors() {
-        consecutiveErrors.incrementAndGet();
+        errors.incrementAndGet();
     }
 
     public int getConsecutiveErrors() {
-        return consecutiveErrors.get();
+        return errors.get();
     }
 
     public Queue<Long> getRecentResponseTimes() {

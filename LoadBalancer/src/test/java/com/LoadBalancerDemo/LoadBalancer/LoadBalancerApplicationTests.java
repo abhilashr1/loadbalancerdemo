@@ -9,5 +9,4 @@ class LoadBalancerApplicationTests {
 	@Test
 	void contextLoads() {
 	}
-
 }

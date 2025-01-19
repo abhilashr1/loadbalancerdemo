@@ -1,14 +1,54 @@
 version: '3.8'
 
 services:
+  loadbalancer:
+    build:
+      context: ./LoadBalancer
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_APPLICATION_JSON={"loadbalancer":{"strategy":"roundrobin","servers":["http://application1:8080","http://application2:8080","http://application3:8080"],"health":{"max-response-times":10,"response-threshold-ms":3000,"slow-threshold-count":3}}}
+    networks:
+      - lbnetwork
+
+  application1:
+    build:
+      context: ./Application
+      dockerfile: Dockerfile
+    expose:
+      - "8080"
+    networks:
+      - lbnetwork
+
+  application2:
+    build:
+      context: ./Application
+      dockerfile: Dockerfile
+    expose:
+      - "8080"
+    networks:
+      - lbnetwork
+
+  application3:
+    build:
+      context: ./Application
+      dockerfile: Dockerfile
+    expose:
+      - "8080"
+    networks:
+      - lbnetwork
+
   prometheus:
     image: prom/prometheus:latest
     ports:
       - "9090:9090"
     volumes:
-      - ./LoadBalancer/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./LoadBalancer/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
+    networks:
+      - lbnetwork
 
   grafana:
     image: grafana/grafana:latest
@@ -17,9 +57,15 @@ services:
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     volumes:
-      - grafana-storage:/var/lib/grafana
+      - grafana-storage:/var/lib/grafana:rw
     depends_on:
       - prometheus
+    networks:
+      - lbnetwork
+
+networks:
+  lbnetwork:
 
 volumes:
-  grafana-storage: 
+  grafana-storage:
+    driver: local

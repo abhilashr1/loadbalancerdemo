@@ -15,15 +15,17 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import com.LoadBalancerDemo.LoadBalancer.Factory.ServerFactory;
 import com.LoadBalancerDemo.LoadBalancer.Factory.StrategyFactory;
 import com.LoadBalancerDemo.LoadBalancer.Models.Server;
 import com.LoadBalancerDemo.LoadBalancer.Service.BalancingStrategies.ILoadBalancingStrategy;
 import com.LoadBalancerDemo.LoadBalancer.Builder.RequestBuilder;
 import com.LoadBalancerDemo.LoadBalancer.Builder.ResponseBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class LoadBalancer {
+    private static final Logger logger = LoggerFactory.getLogger(LoadBalancer.class);
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 
     private final List<Server> servers;
@@ -36,13 +38,14 @@ public class LoadBalancer {
 
     public LoadBalancer(RestTemplate restTemplate,
                         StrategyFactory strategyFactory,
-                        ServerFactory serverFactory,
+                        List<Server> servers,
                         MeterRegistry registry) {
         this.restTemplate = restTemplate;
         this.strategy = strategyFactory.createStrategy();
-        this.servers = serverFactory.initializeServers();
+        this.servers = servers;
 
         initializeCounters(registry);
+        logger.info("LoadBalancer initialized with {} servers", servers.size());
     }
 
     public CompletableFuture<ResponseEntity<String>> forwardRequest(byte[] body, HttpServletRequest request) {
@@ -54,6 +57,7 @@ public class LoadBalancer {
             RequestBuilder requestBuilder = RequestBuilder.from(request, body);
             String url = server.getUrl() + requestBuilder.getPath();
             
+            logger.info("Forwarding {} request to {}", requestBuilder.getMethod(), url);
             long startTime = System.currentTimeMillis();
             
             try {
@@ -66,6 +70,8 @@ public class LoadBalancer {
 
                 long responseTime = System.currentTimeMillis() - startTime;
                 server.addResponseTime(responseTime);
+                
+                logger.debug("Response received from {} in {}ms", url, responseTime);
 
                 ResponseEntity<String> finalResponse = ResponseBuilder.from(response)
                     .copyHeaders()
@@ -79,6 +85,7 @@ public class LoadBalancer {
                 errorCounter.increment();
                 server.incrementErrors();
                 this.strategy.handleServerFailure(server);
+                logger.error("Request to {} failed: {}", url, e.getMessage(), e);
                 throw e;
             }
         }, executor);

@@ -33,7 +33,7 @@ class RoundRobinStrategyTest {
 
     @Test
     void skipsUnhealthyServer() {
-        servers.get(0).setHealthy(false);
+        servers.get(0).setUnhealthyFromError();
         var server = strategy.getNextServer(servers);
         
         assertEquals("http://localhost:8082", server.getUrl());

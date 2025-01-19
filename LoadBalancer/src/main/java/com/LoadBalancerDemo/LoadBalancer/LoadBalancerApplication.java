@@ -13,6 +13,9 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
 import java.time.Duration;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import java.util.List;
+import com.LoadBalancerDemo.LoadBalancer.Models.Server;
+import com.LoadBalancerDemo.LoadBalancer.Factory.ServerFactory;
 
 @SpringBootApplication
 @EnableConfigurationProperties
@@ -37,5 +40,10 @@ public class LoadBalancerApplication {
 	@Bean
 	public RestTemplate restTemplate() {
 		return new RestTemplate();
+	}
+
+	@Bean
+	public List<Server> servers(ServerFactory serverFactory) {
+		return serverFactory.initializeServers();
 	}
 }

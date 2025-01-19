@@ -25,7 +25,6 @@ import static org.mockito.Mockito.*;
 class LoadBalancerTest {
     @Mock private RestTemplate restTemplate;
     @Mock private StrategyFactory strategyFactory;
-    @Mock private ServerFactory serverFactory;
     @Mock private ILoadBalancingStrategy strategy;
     @Mock private HttpServletRequest request;
 
@@ -42,11 +41,10 @@ class LoadBalancerTest {
             new Server("http://server2")
         );
 
-        when(serverFactory.initializeServers()).thenReturn(servers);
         when(strategyFactory.createStrategy()).thenReturn(strategy);
         when(strategy.getNextServer(any())).thenReturn(servers.get(0));
         
-        loadBalancer = new LoadBalancer(restTemplate, strategyFactory, serverFactory, meterRegistry);
+        loadBalancer = new LoadBalancer(restTemplate, strategyFactory, servers, meterRegistry);
     }
 
     @Test

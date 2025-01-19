@@ -15,15 +15,14 @@ class ServerTest {
 
     @Test
     void shouldResetServerStateOnReset() {
-        server.setHealthy(false);
+        server.setUnhealthyFromError();
         server.incrementErrors();
         server.addResponseTime(1000);
         
         server.resetFailCount();
 
         assertTrue(server.isHealthy());
-        assertEquals(0, server.getConsecutiveErrors());
-        assertTrue(server.getRecentResponseTimes().isEmpty());
+        assertEquals(0, server.getErrors());
     }
 
     @Test

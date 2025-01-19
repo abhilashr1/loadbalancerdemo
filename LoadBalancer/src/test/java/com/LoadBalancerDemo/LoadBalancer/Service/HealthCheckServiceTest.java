@@ -15,7 +15,7 @@ import static org.mockito.Mockito.*;
 
 class HealthCheckServiceTest {
     @Mock private LoadBalancerProperties props;
-    @Mock private LoadBalancerProperties.HealthConfig healthConfig;
+    @Mock private LoadBalancerProperties.Health healthConfig;
     private HealthCheckService service;
     private List<Server> servers;
 
@@ -23,7 +23,7 @@ class HealthCheckServiceTest {
     void setup() {
         MockitoAnnotations.openMocks(this);
         when(props.getHealth()).thenReturn(healthConfig);
-        when(healthConfig.getResponseThresholdMs()).thenReturn(1200L);
+        when(healthConfig.getSlowResponseThresholdMs()).thenReturn(1200L);
         when(healthConfig.getSlowThresholdCount()).thenReturn(3);
 
         servers = List.of(new Server("localhost:8080"));

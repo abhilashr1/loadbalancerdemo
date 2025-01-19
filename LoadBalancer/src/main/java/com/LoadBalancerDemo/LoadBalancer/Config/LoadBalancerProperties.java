@@ -1,9 +1,9 @@
 package com.LoadBalancerDemo.LoadBalancer.Config;
 
+import java.util.List;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
-
-import java.util.List;
 
 @Component
 @ConfigurationProperties(prefix = "loadbalancer")
@@ -11,7 +11,7 @@ public class LoadBalancerProperties {
 
     private String strategy;
     private List<String> servers;
-    private HealthConfig health = new HealthConfig();
+    private Health health = new Health();
 
     public String getStrategy() {
         return strategy;
@@ -29,29 +29,31 @@ public class LoadBalancerProperties {
         this.servers = servers;
     }
 
-    public HealthConfig getHealth() {
+    public Health getHealth() {
         return health;
     }
 
-    public void setHealth(HealthConfig health) {
+    public void setHealth(Health health) {
         this.health = health;
     }
 
-    public static class HealthConfig {
-        private final int DEFAULT_RESPONSE_THRESHOLD_MS = 10000;
+    public static class Health {
+        private final int DEFAULT_SLOW_RESPONSE_THRESHOLD_MS = 10000;
         private final int DEFAULT_SLOW_THRESHOLD_COUNT = 10;
-        private final int DEFAULT_CHECK_INTERVAL = 5000;
+        private final int DEFAULT_SLOW_CHECK_INTERVAL = 5000;
+        private final int DEFAULT_SLOW_COOLDOWN_MS = 5;
 
-        private long responseThresholdMs = DEFAULT_RESPONSE_THRESHOLD_MS;
+        private long slowResponseThresholdMs = DEFAULT_SLOW_RESPONSE_THRESHOLD_MS;
         private int slowThresholdCount = DEFAULT_SLOW_THRESHOLD_COUNT;
-        private long checkInterval = DEFAULT_CHECK_INTERVAL;
+        private long slowCheckInterval = DEFAULT_SLOW_CHECK_INTERVAL;
+        private long slowCooldownMs = DEFAULT_SLOW_COOLDOWN_MS;
 
-        public long getResponseThresholdMs() {
-            return responseThresholdMs;
+        public long getSlowResponseThresholdMs() {
+            return slowResponseThresholdMs;
         }
 
-        public void setResponseThresholdMs(long responseThresholdMs) {
-            this.responseThresholdMs = responseThresholdMs;
+        public void setSlowResponseThresholdMs(long responseThresholdMs) {
+            this.slowResponseThresholdMs = responseThresholdMs;
         }
 
         public int getSlowThresholdCount() {
@@ -62,12 +64,20 @@ public class LoadBalancerProperties {
             this.slowThresholdCount = slowThresholdCount;
         }
 
-        public long getCheckInterval() {
-            return checkInterval;
+        public long getSlowCheckInterval() {
+            return slowCheckInterval;
         }
 
-        public void setCheckInterval(long checkInterval) {
-            this.checkInterval = checkInterval;
+        public void setSlowCheckInterval(long checkInterval) {
+            this.slowCheckInterval = checkInterval;
+        }
+
+        public long getSlowCooldownMs() {
+            return slowCooldownMs;
+        }
+
+        public void setSlowCooldownMs(long cooldownMs) {
+            this.slowCooldownMs = cooldownMs;
         }
     }
 }

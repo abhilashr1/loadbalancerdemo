@@ -1,12 +1,13 @@
-package com.LoadBalancerDemo.LoadBalancer.Service.Strategies;
+package com.LoadBalancerDemo.LoadBalancer.Service.BalancingStrategies;
 
-import com.LoadBalancerDemo.LoadBalancer.Models.Server;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import com.LoadBalancerDemo.LoadBalancer.Models.Server;
 
 @Component
 public class RoundRobinStrategy implements ILoadBalancingStrategy {
@@ -41,6 +42,10 @@ public class RoundRobinStrategy implements ILoadBalancingStrategy {
 
     @Override
     public void handleServerFailure(Server server) {
-        server.setHealthy(false);
+        server.incrementErrors();
+        
+        if (server.getConsecutiveErrors() >= 3) {
+            server.setHealthy(false);
+        }
     }
 }

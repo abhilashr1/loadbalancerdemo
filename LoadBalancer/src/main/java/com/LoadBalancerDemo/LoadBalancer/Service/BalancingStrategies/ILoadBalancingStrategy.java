@@ -1,4 +1,4 @@
-package com.LoadBalancerDemo.LoadBalancer.Service.Strategies;
+package com.LoadBalancerDemo.LoadBalancer.Service.BalancingStrategies;
 
 import com.LoadBalancerDemo.LoadBalancer.Models.Server;
 

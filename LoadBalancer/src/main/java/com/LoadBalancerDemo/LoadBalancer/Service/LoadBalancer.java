@@ -1,6 +1,5 @@
 package com.LoadBalancerDemo.LoadBalancer.Service;
 
-import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -11,8 +10,6 @@ import java.util.stream.Collectors;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -21,7 +18,9 @@ import org.springframework.web.client.RestTemplate;
 import com.LoadBalancerDemo.LoadBalancer.Factory.ServerFactory;
 import com.LoadBalancerDemo.LoadBalancer.Factory.StrategyFactory;
 import com.LoadBalancerDemo.LoadBalancer.Models.Server;
-import com.LoadBalancerDemo.LoadBalancer.Service.Strategies.ILoadBalancingStrategy;
+import com.LoadBalancerDemo.LoadBalancer.Service.BalancingStrategies.ILoadBalancingStrategy;
+import com.LoadBalancerDemo.LoadBalancer.Builder.RequestBuilder;
+import com.LoadBalancerDemo.LoadBalancer.Builder.ResponseBuilder;
 
 @Service
 public class LoadBalancer {
@@ -38,7 +37,6 @@ public class LoadBalancer {
     public LoadBalancer(RestTemplate restTemplate,
                         StrategyFactory strategyFactory,
                         ServerFactory serverFactory,
-                        // add Request and response Builder here
                         MeterRegistry registry) {
         this.restTemplate = restTemplate;
         this.strategy = strategyFactory.createStrategy();
@@ -49,52 +47,37 @@ public class LoadBalancer {
 
     public CompletableFuture<ResponseEntity<String>> forwardRequest(byte[] body, HttpServletRequest request) {
         return CompletableFuture.supplyAsync(() -> {
-            String path = request.getRequestURI();
-            HttpMethod method = HttpMethod.valueOf(request.getMethod());
-
             Server server = this.strategy.getNextServer(this.servers);
             requestCounter.increment();
             serverRequestCounters.get(server.getUrl()).increment();
 
-            String url = server.getUrl() + path;
+            RequestBuilder requestBuilder = RequestBuilder.from(request, body);
+            String url = server.getUrl() + requestBuilder.getPath();
+            
+            long startTime = System.currentTimeMillis();
+            
             try {
-                HttpHeaders headers = new HttpHeaders();
-                Enumeration<String> headerNames = request.getHeaderNames();
-                while (headerNames != null && headerNames.hasMoreElements()) {
-                    String headerName = headerNames.nextElement();
-                    String headerValue = request.getHeader(headerName);
-                    headers.add(headerName, headerValue);
-                }
-
-                HttpEntity<String> requestEntity = new HttpEntity<>(
-                    body != null ? new String(body) : "",
-                    headers
-                );
-
                 ResponseEntity<String> response = restTemplate.exchange(
                     url,
-                    method,
-                    requestEntity,
+                    HttpMethod.valueOf(requestBuilder.getMethod()),
+                    requestBuilder.copyHeaders().build(),
                     String.class
                 );
 
-                HttpHeaders responseHeaders = new HttpHeaders();
-                responseHeaders.putAll(response.getHeaders());
-                responseHeaders.remove(HttpHeaders.TRANSFER_ENCODING);
+                long responseTime = System.currentTimeMillis() - startTime;
+                server.addResponseTime(responseTime);
 
-                String responseBody = response.getBody();
-                if (responseBody != null) {
-                    responseHeaders.setContentLength(responseBody.length());
-                }
+                ResponseEntity<String> finalResponse = ResponseBuilder.from(response)
+                    .copyHeaders()
+                    .setContentLength()
+                    .build();
 
                 server.resetFailCount();
-                return ResponseEntity
-                    .status(response.getStatusCode())
-                    .headers(responseHeaders)
-                    .body(responseBody);
+                return finalResponse;
 
             } catch (Exception e) {
                 errorCounter.increment();
+                server.incrementErrors();
                 this.strategy.handleServerFailure(server);
                 throw e;
             }

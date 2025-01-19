@@ -1,8 +1,8 @@
 package com.LoadBalancerDemo.LoadBalancer.Factory;
 
 import com.LoadBalancerDemo.LoadBalancer.Config.LoadBalancerProperties;
-import com.LoadBalancerDemo.LoadBalancer.Service.Strategies.ILoadBalancingStrategy;
-import com.LoadBalancerDemo.LoadBalancer.Service.Strategies.RoundRobinStrategy;
+import com.LoadBalancerDemo.LoadBalancer.Service.BalancingStrategies.ILoadBalancingStrategy;
+import com.LoadBalancerDemo.LoadBalancer.Service.BalancingStrategies.RoundRobinStrategy;
 import org.springframework.stereotype.Component;
 
 @Component
